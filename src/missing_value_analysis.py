@@ -62,6 +62,58 @@ for file in PROCESSED_DIR.glob("*.csv"):
         # However, some delivered orders have missing approval or delivery timestamps,
         # which require further validation. No data was modified.
 
+    #Products dataset
+    if file.name == "olist_products_dataset.csv":
+
+        missing_products = df[df["product_category_name"].isnull()]
+
+        print("Products with missing category:", len(missing_products))
+
+        print(missing_products[
+            ["product_id", "product_category_name",
+            "product_name_lenght", "product_description_lenght",
+            "product_photos_qty"]
+        ].head())
+
+        descriptive_cols = [
+        "product_category_name",
+        "product_name_lenght",
+        "product_description_lenght",
+        "product_photos_qty"
+        ]
+
+        all_missing = missing_products[descriptive_cols].isnull().all(axis=1)
+
+        print("Products with all 4 fields missing:", all_missing.sum())
+
+        dimension_cols = [
+        "product_weight_g",
+        "product_length_cm",
+        "product_height_cm",
+        "product_width_cm"
+        ]
+
+        missing_dimensions = df[
+        df[dimension_cols].isnull().any(axis=1)
+        ]
+
+        print("Products with missing dimensions:", len(missing_dimensions))
+
+        print(missing_dimensions[
+            ["product_id", "product_category_name"] + dimension_cols
+        ])
+
+        print(missing_dimensions[
+        ["product_id", "product_weight_g",
+        "product_length_cm", "product_height_cm",
+        "product_width_cm"]
+        ].to_string(index=False))
+
+        # 610 products have all four descriptive fields missing.
+        # 2 products have all four physical dimension fields missing.
+        # These missing values require further investigation before handling.
+        # No records were modified.
+
     missing_value = df.isnull().sum()
     missing_value = missing_value[missing_value > 0]
 
