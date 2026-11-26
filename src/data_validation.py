@@ -4,6 +4,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
+validation_errors = []
+validation_warnings = []
 
 
 # Primary keys
@@ -37,9 +39,18 @@ for file in sorted(PROCESSED_DIR.glob("*.csv")):
 
         key = primary_keys[file.name]
 
+        null_count = df[key].isna().sum()
+        duplicate_count = df[key].duplicated().sum()
+
         print("Primary key:", key)
-        print("Null values:", df[key].isna().sum())
-        print("Duplicate key values:", df[key].duplicated().sum())
+        print("Null values:", null_count)
+        print("Duplicate key values:", duplicate_count)
+
+        if null_count > 0 or duplicate_count > 0:
+            validation_errors.append(
+                f"{file.name}: Primary key validation failed "
+                f"(nulls={null_count}, duplicates={duplicate_count})"
+            )
 
     elif file.name in composite_keys:
 
@@ -51,6 +62,12 @@ for file in sorted(PROCESSED_DIR.glob("*.csv")):
         print("Composite key:", keys)
         print("Rows with null key values:", null_count)
         print("Duplicate key combinations:", duplicate_count)
+
+        if null_count > 0 or duplicate_count > 0:
+            validation_errors.append(
+                f"{file.name}: Composite key validation failed "
+                f"(nulls={null_count}, duplicates={duplicate_count})"
+            )
 
     else:
         print("No primary key defined.")
@@ -130,7 +147,10 @@ def validate_foreign_key(
     print(f"\nForeign Key Validation: {relationship}")
     print("Invalid references:", len(invalid))
     print("Unique invalid values:", invalid[child_column].nunique())
-    print("Null values:", child_df[child_column].isna().sum())
+    if len(invalid) > 0:
+        validation_errors.append(
+            f"{relationship}: {len(invalid)} invalid foreign key references"
+        )
 
 
 # 3. Load datasets required for foreign key validation
@@ -198,7 +218,11 @@ invalid_categories = products_df[
 
 print("\nForeign Key Validation: Products -> Category Translation")
 
-print("Invalid category references:", len(invalid_categories))
+if len(invalid_categories) > 0:
+    validation_warnings.append(
+        f"Product category translation gaps found: "
+        f"{len(invalid_categories)} records"
+    )
 
 print("Unique invalid categories:",
       invalid_categories["product_category_name"].nunique())
@@ -219,3 +243,26 @@ print(
 # Some product categories may not have a corresponding translation.
 # These are mapping gaps, not necessarily invalid source categories.
 # No records were modified.
+
+# 7. Final Validation Summary
+
+print("\n" + "=" * 60)
+print("FINAL DATA VALIDATION SUMMARY")
+print("=" * 60)
+
+print("Total validation errors:", len(validation_errors))
+print("Total validation warnings:", len(validation_warnings))
+
+if validation_warnings:
+    print("\nWarnings:")
+    for warning in validation_warnings:
+        print("-", warning)
+
+if validation_errors:
+    print("\nValidation Errors:")
+    for error in validation_errors:
+        print("-", error)
+
+    raise ValueError("Data validation failed!")
+
+print("\nData validation completed successfully!")
