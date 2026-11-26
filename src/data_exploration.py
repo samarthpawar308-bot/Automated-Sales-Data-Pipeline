@@ -1,34 +1,29 @@
 
 import pandas as pd
-import os
+from pathlib import Path
 
-file_path = "data/raw/"
+# Dataset directory
+data_path = Path("data/raw")
 
-
-files = os.listdir(file_path)
+# List available CSV files
+files = sorted(data_path.glob("*.csv"))
 
 print("Available datasets:")
-
 for file in files:
-    print(file)
+    print(file.name)
 
 # Load orders dataset
-orders = pd.read_csv(
-    file_path + "olist_orders_dataset.csv"
-)
+orders = pd.read_csv(data_path / "olist_orders_dataset.csv")
 
-# Display first five records
+# Basic exploration
 print("\nFirst five records:")
 print(orders.head())
 
-# Display dataset dimensions
-print("\nDataset shape:")
-print(orders.shape)
+print("\nDataset dimensions:", orders.shape)
 
-# Display column information
 print("\nDataset information:")
-print(orders.info())
+orders.info()
 
-# Check missing values
 print("\nMissing values:")
 print(orders.isnull().sum())
+

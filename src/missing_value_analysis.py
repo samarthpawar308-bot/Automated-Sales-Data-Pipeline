@@ -1,123 +1,127 @@
+
 import pandas as pd
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
-for file in PROCESSED_DIR.glob("*.csv"):
+for file in sorted(PROCESSED_DIR.glob("*.csv")):
+
     if file.name == "quality_report.csv":
         continue
 
-    print("\n Analyzing : ", file.name)
+    print("\nAnalyzing:", file.name)
     df = pd.read_csv(file)
 
+    # Review dataset analysis
     if file.name == "olist_order_reviews_dataset.csv":
 
-        print("Total reviews:", len(df))
-
-        print("Missing review scores:", df["review_score"].isnull().sum())
-
         both_missing = (
-            df["review_comment_title"].isnull() &
-            df["review_comment_message"].isnull()
+            df["review_comment_title"].isna() &
+            df["review_comment_message"].isna()
         )
 
+        print("Total reviews:", len(df))
+        print("Missing review scores:", df["review_score"].isna().sum())
         print("Both comments missing:", both_missing.sum())
 
-        print("Ratings present despite missing comments:",
-            df.loc[both_missing, "review_score"].notnull().sum())
+        print(
+            "Ratings present despite missing comments:",
+            df.loc[both_missing, "review_score"].notna().sum()
+        )
 
-        #Conclusion of this is that customers can submit a rating without leaving a feedback
+    # Orders dataset analysis
+    elif file.name == "olist_orders_dataset.csv":
 
-    if file.name == "olist_orders_dataset.csv":
-        print(df['order_status'].value_counts())
+        print("\nOrder status distribution:")
+        print(df["order_status"].value_counts())
 
-        missing_status = df.groupby('order_status')['order_delivered_customer_date'].apply(lambda x : x.isnull().sum())
-        print(missing_status) #missing dates of delivered orders according to each order status
+        missing_delivery = df["order_delivered_customer_date"].isna()
 
-        #investigating furthur for missing delivery dates for orders that were deliverd
-        delivered_missing = df[(df["order_status"] == "delivered") & (df['order_delivered_customer_date'].isnull())]
-        print(delivered_missing[["order_id", "order_status", "order_delivered_customer_date", "order_delivered_carrier_date", "order_estimated_delivery_date"]])
+        missing_status = missing_delivery.groupby(df["order_status"]).sum()
+        print("\nMissing delivery dates by order status:")
+        print(missing_status)
 
+        delivered_missing = df[
+            (df["order_status"] == "delivered") &
+            missing_delivery
+        ]
 
-        missing_approval = df[df["order_approved_at"].isnull()]
+        print("\nDelivered orders with missing delivery dates:")
+        print(delivered_missing[
+            [
+                "order_id",
+                "order_status",
+                "order_delivered_customer_date",
+                "order_delivered_carrier_date",
+                "order_estimated_delivery_date"
+            ]
+        ])
 
-        print("Missing approval timestamps:", len(missing_approval))
+        missing_approval = df[df["order_approved_at"].isna()]
 
+        print("\nMissing approval timestamps:", len(missing_approval))
         print(missing_approval["order_status"].value_counts())
 
         delivered_missing_approval = df[
-        (df["order_status"] == "delivered") &
-        (df["order_approved_at"].isnull())
-        ]   
-
-        print(delivered_missing_approval[
-        ["order_id", "order_purchase_timestamp",
-        "order_approved_at", "order_delivered_customer_date"]
-        ])
-
-        # Missing values were investigated in the order timestamp columns.
-        # Most missing values appear to be related to order statuses.
-        # However, some delivered orders have missing approval or delivery timestamps,
-        # which require further validation. No data was modified.
-
-    #Products dataset
-    if file.name == "olist_products_dataset.csv":
-
-        missing_products = df[df["product_category_name"].isnull()]
-
-        print("Products with missing category:", len(missing_products))
-
-        print(missing_products[
-            ["product_id", "product_category_name",
-            "product_name_lenght", "product_description_lenght",
-            "product_photos_qty"]
-        ].head())
-
-        descriptive_cols = [
-        "product_category_name",
-        "product_name_lenght",
-        "product_description_lenght",
-        "product_photos_qty"
+            (df["order_status"] == "delivered") &
+            df["order_approved_at"].isna()
         ]
 
-        all_missing = missing_products[descriptive_cols].isnull().all(axis=1)
+        print("\nDelivered orders with missing approval timestamps:")
+        print(delivered_missing_approval[
+            [
+                "order_id",
+                "order_purchase_timestamp",
+                "order_approved_at",
+                "order_delivered_customer_date"
+            ]
+        ])
 
-        print("Products with all 4 fields missing:", all_missing.sum())
+    # Products dataset analysis
+    elif file.name == "olist_products_dataset.csv":
+
+        missing_products = df[df["product_category_name"].isna()]
+
+        print("\nProducts with missing category:", len(missing_products))
+
+        descriptive_cols = [
+            "product_category_name",
+            "product_name_lenght",
+            "product_description_lenght",
+            "product_photos_qty"
+        ]
+
+        print(missing_products[
+            ["product_id"] + descriptive_cols
+        ].head())
+
+        all_missing = missing_products[descriptive_cols].isna().all(axis=1)
+
+        print("Products with all 4 descriptive fields missing:", all_missing.sum())
 
         dimension_cols = [
-        "product_weight_g",
-        "product_length_cm",
-        "product_height_cm",
-        "product_width_cm"
+            "product_weight_g",
+            "product_length_cm",
+            "product_height_cm",
+            "product_width_cm"
         ]
 
         missing_dimensions = df[
-        df[dimension_cols].isnull().any(axis=1)
+            df[dimension_cols].isna().any(axis=1)
         ]
 
         print("Products with missing dimensions:", len(missing_dimensions))
 
         print(missing_dimensions[
             ["product_id", "product_category_name"] + dimension_cols
-        ])
-
-        print(missing_dimensions[
-        ["product_id", "product_weight_g",
-        "product_length_cm", "product_height_cm",
-        "product_width_cm"]
         ].to_string(index=False))
 
-        # 610 products have all four descriptive fields missing.
-        # 2 products have all four physical dimension fields missing.
-        # These missing values require further investigation before handling.
-        # No records were modified.
+    # Overall missing-value analysis
+    missing_values = df.isna().sum()
+    missing_values = missing_values[missing_values > 0]
 
-    missing_value = df.isnull().sum()
-    missing_value = missing_value[missing_value > 0]
+    missing_percentage = (missing_values / len(df)) * 100
 
-    #calculating missing value percentage for each dataset
-    total_rows = len(df)
-    missing_value_percentage = (missing_value/ total_rows) * 100
-    print(missing_value_percentage)
+    print("\nMissing value percentage:")
+    print(missing_percentage)
